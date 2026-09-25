@@ -25,6 +25,15 @@ curl -X POST http://localhost:10000/authorization \
   -H 'Authorization: Bearer example-token'
 ```
 
+Add any single path segment—such as a UUID—to correlate the log entry with a
+specific sender or test:
+
+```sh
+curl -X POST \
+  http://localhost:10000/authorization/550e8400-e29b-41d4-a716-446655440000 \
+  -H 'Authorization: Bearer example-token'
+```
+
 The response is deliberately minimal and never echoes the credential:
 
 ```json
@@ -39,6 +48,7 @@ service's **Logs** page.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `POST` | `/authorization` | Log the `Authorization` header |
+| `POST` | `/authorization/{request_id}` | Log the header and request identifier |
 | `GET` | `/healthz` | Render health check |
 | `GET` | `/` | List the available tools |
 

@@ -20,8 +20,9 @@ func NewHandler(logger *slog.Logger) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"name": "webhook-swiss-army-knife",
 			"endpoints": map[string]string{
-				"POST /authorization": "logs the Authorization request header",
-				"GET /healthz":        "health check",
+				"POST /authorization":              "logs the Authorization request header",
+				"POST /authorization/{request_id}": "logs the header with a request identifier",
+				"GET /healthz":                     "health check",
 			},
 		})
 	})
@@ -30,18 +31,24 @@ func NewHandler(logger *slog.Logger) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	mux.HandleFunc("POST /authorization", func(w http.ResponseWriter, r *http.Request) {
+	logAuthorization := func(w http.ResponseWriter, r *http.Request) {
 		authorization := r.Header.Get("Authorization")
+		requestID := r.PathValue("requestID")
 		logger.Info("authorization header received",
 			"authorization", authorization,
 			"present", authorization != "",
+			"request_id", requestID,
 			"remote_addr", r.RemoteAddr,
 		)
 
 		writeJSON(w, http.StatusOK, map[string]any{
-			"logged": authorization != "",
+			"logged":     authorization != "",
+			"request_id": requestID,
 		})
-	})
+	}
+
+	mux.HandleFunc("POST /authorization", logAuthorization)
+	mux.HandleFunc("POST /authorization/{requestID}", logAuthorization)
 
 	return securityHeaders(mux)
 }

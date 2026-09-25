@@ -39,6 +39,26 @@ func TestAuthorizationEndpointLogsHeader(t *testing.T) {
 	}
 }
 
+func TestAuthorizationEndpointLogsRequestID(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	request := httptest.NewRequest(http.MethodPost, "/authorization/550e8400-e29b-41d4-a716-446655440000", nil)
+	request.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+	recorder := httptest.NewRecorder()
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d; want %d", recorder.Code, http.StatusOK)
+	}
+	if !strings.Contains(logs.String(), `"authorization":"Basic dXNlcjpwYXNz"`) {
+		t.Fatalf("log did not contain authorization header: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), `"request_id":"550e8400-e29b-41d4-a716-446655440000"`) {
+		t.Fatalf("log did not contain request ID: %s", logs.String())
+	}
+}
+
 func TestOnlyPOSTIsAccepted(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	recorder := httptest.NewRecorder()
