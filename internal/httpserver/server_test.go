@@ -1,0 +1,64 @@
+package httpserver
+
+import (
+	"bytes"
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
+
+func TestAuthorizationEndpointLogsHeader(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	request := httptest.NewRequest(http.MethodPost, "/authorization", nil)
+	request.Header.Set("Authorization", "Bearer test-token")
+	recorder := httptest.NewRecorder()
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+	response := recorder.Result()
+	t.Cleanup(func() { _ = response.Body.Close() })
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d; want %d", response.StatusCode, http.StatusOK)
+	}
+	if !strings.Contains(logs.String(), `"authorization":"Bearer test-token"`) {
+		t.Fatalf("log did not contain authorization header: %s", logs.String())
+	}
+
+	var body struct {
+		Logged bool `json:"logged"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if !body.Logged {
+		t.Fatal("logged = false; want true")
+	}
+}
+
+func TestOnlyPOSTIsAccepted(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/authorization", nil)
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d; want %d", recorder.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestHealth(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d; want %d", recorder.Code, http.StatusOK)
+	}
+}
