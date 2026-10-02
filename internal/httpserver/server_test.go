@@ -59,6 +59,42 @@ func TestAuthorizationEndpointLogsRequestID(t *testing.T) {
 	}
 }
 
+func TestAuthorizationEndpointLogsRenderClientIP(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	request := httptest.NewRequest(http.MethodPost, "/authorization", nil)
+	request.Header.Set("X-Forwarded-For", "203.0.113.42, 198.51.100.7")
+	request.Header.Set("CF-Ray", "abc123-SJC")
+	request.RemoteAddr = "10.0.0.5:4321"
+	recorder := httptest.NewRecorder()
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+
+	if !strings.Contains(logs.String(), `"client_ip":"203.0.113.42"`) {
+		t.Fatalf("log did not contain Render client IP: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), `"x_forwarded_for":"203.0.113.42, 198.51.100.7"`) {
+		t.Fatalf("log did not contain forwarded chain: %s", logs.String())
+	}
+	if !strings.Contains(logs.String(), `"cf_ray":"abc123-SJC"`) {
+		t.Fatalf("log did not contain CF-Ray ID: %s", logs.String())
+	}
+}
+
+func TestAuthorizationEndpointFallsBackToRemoteIP(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	request := httptest.NewRequest(http.MethodPost, "/authorization", nil)
+	request.RemoteAddr = "192.0.2.10:4321"
+	recorder := httptest.NewRecorder()
+
+	NewHandler(logger).ServeHTTP(recorder, request)
+
+	if !strings.Contains(logs.String(), `"client_ip":"192.0.2.10"`) {
+		t.Fatalf("log did not contain remote client IP fallback: %s", logs.String())
+	}
+}
+
 func TestOnlyPOSTIsAccepted(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	recorder := httptest.NewRecorder()

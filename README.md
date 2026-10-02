@@ -41,7 +41,13 @@ The response is deliberately minimal and never echoes the credential:
 ```
 
 The server writes a JSON log entry to stdout. On Render, find it on the
-service's **Logs** page.
+service's **Logs** page. Each authorization log includes:
+
+- `client_ip`: the original caller IP (the first address in Render's
+  `X-Forwarded-For` header), falling back to the direct connection address
+- `x_forwarded_for`: the complete proxy chain for debugging
+- `cf_ray`: Cloudflare's request trace ID
+- `remote_addr`: the direct connection address, which is usually Render's proxy
 
 ## Endpoints
 

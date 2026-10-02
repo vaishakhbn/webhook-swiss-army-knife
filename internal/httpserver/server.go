@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -38,6 +40,9 @@ func NewHandler(logger *slog.Logger) http.Handler {
 			"authorization", authorization,
 			"present", authorization != "",
 			"request_id", requestID,
+			"client_ip", clientIP(r),
+			"x_forwarded_for", r.Header.Get("X-Forwarded-For"),
+			"cf_ray", r.Header.Get("CF-Ray"),
 			"remote_addr", r.RemoteAddr,
 		)
 
@@ -51,6 +56,24 @@ func NewHandler(logger *slog.Logger) http.Handler {
 	mux.HandleFunc("POST /authorization/{requestID}", logAuthorization)
 
 	return securityHeaders(mux)
+}
+
+// clientIP returns the original client address supplied by Render's proxy. Render
+// places it first in X-Forwarded-For. RemoteAddr remains the fallback for local
+// development and requests that do not pass through Render's public proxy.
+func clientIP(r *http.Request) string {
+	if forwardedFor := r.Header.Get("X-Forwarded-For"); forwardedFor != "" {
+		first, _, _ := strings.Cut(forwardedFor, ",")
+		if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
+			return ip.String()
+		}
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 // Run starts the production HTTP server on Render's PORT, or 10000 locally.
